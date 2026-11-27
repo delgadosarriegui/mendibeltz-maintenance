@@ -4,7 +4,7 @@
 
 AI maintenance assistant for **Mendibeltz Wind Farm** (fictional), built with **Microsoft Foundry** as the Challenge Day 4 project of the Cloud Computing course (MADI, Universidad de Navarra).
 
-The agent answers maintenance questions from technical documentation, runs calculations, and manages maintenance tickets as GitHub issues in this very repository.
+The agent answers maintenance and safety questions from company documentation, analyses turbine data, and manages maintenance tickets as GitHub issues in this very repository.
 
 ## Table of contents
 
@@ -12,7 +12,7 @@ The agent answers maintenance questions from technical documentation, runs calcu
 - [How it works](#how-it-works)
 - [Repository structure](#repository-structure)
 - [Getting started](#getting-started)
-- [Example conversation](#example-conversation)
+- [Real examples](#real-examples)
 - [Maintenance tickets](#maintenance-tickets)
 - [Troubleshooting](#troubleshooting)
 - [Tech stack](#tech-stack)
@@ -22,10 +22,10 @@ The agent answers maintenance questions from technical documentation, runs calcu
 
 | Capability | What it does |
 |---|---|
-| **Custom instructions** | Maintenance-focused behavior with safety reminders and a fixed ticket format ([docs/agent_instructions.md](docs/agent_instructions.md)) |
-| **Knowledge base** | Technical PDFs stored in the Storage account of the Foundry resource and indexed for retrieval ([manual](docs/mendibeltz_maintenance_manual.pdf)) |
-| **Code Interpreter** | Calculations and data analysis, such as availability, downtime or trends |
-| **GitHub MCP** | Lists, creates and comments on maintenance tickets, which are the [Issues](../../issues) of this repository |
+| **Custom instructions** | Maintenance-focused behavior: safety first, grounded in the company documents, with recommended actions and spare parts |
+| **Knowledge base** | Company documents (safety procedure, alarm and failure-mode references, maintenance manual, service bulletins, spare-parts stock) stored in the Storage account of the Foundry resource and indexed for retrieval |
+| **Code Interpreter** | Analysis of turbine data, such as SCADA temperatures, vibration and alarm history |
+| **GitHub MCP** | Reads, comments on and labels maintenance tickets, which are the [Issues](../../issues) of this repository |
 | **Terminal client** | Python chat ([agent.py](agent.py)) that asks for confirmation before every tool call |
 
 ## How it works
@@ -39,16 +39,16 @@ The agent answers maintenance questions from technical documentation, runs calcu
               ┌───────────────────────────┼───────────────────────────┐
               ▼                           ▼                           ▼
      Knowledge base (PDFs)        Code Interpreter           GitHub MCP tool
-     manuals, alarm codes         calculations, data         read / create issues
-                                                                      │
+     procedures, alarms,          SCADA data analysis        read / comment on issues
+     bulletins, spare parts                                          │
                                                                       ▼
                                                            Maintenance tickets
 ```
 
-1. The user asks a question in the terminal.
+1. A technician reports an incident as a GitHub issue, or asks a question in the terminal.
 2. The agent decides whether it needs the documents, the Code Interpreter or the GitHub tool.
-3. If it needs GitHub, the terminal shows the exact call and waits for the user to approve it (`y/N`).
-4. The agent answers, citing the document it used.
+3. If it needs GitHub, the terminal shows the exact call and waits for approval (`y/N`).
+4. The agent answers with a diagnosis or decision, the recommended action, the spare parts needed and the safety precautions.
 
 ## Repository structure
 
@@ -57,9 +57,9 @@ The agent answers maintenance questions from technical documentation, runs calcu
 | `agent.py` | Terminal chat client for the agent |
 | `requirements.txt` | Python dependencies |
 | `.env.example` | Template for environment variables (copy to `.env`) |
-| `docs/mendibeltz_maintenance_manual.pdf` | Maintenance manual used as knowledge base |
-| `docs/agent_instructions.md` | System instructions of the agent |
-| `.github/ISSUE_TEMPLATE/maintenance_ticket.md` | Template for maintenance tickets |
+| `.github/ISSUE_TEMPLATE/maintenance_ticket.md` | Template for maintenance reports |
+
+The company documents used as knowledge base are fictional course material and are not included in this repository.
 
 ## Getting started
 
@@ -71,9 +71,9 @@ The agent answers maintenance questions from technical documentation, runs calcu
 
 ### 1. Create the agent in the Foundry portal
 
-1. Paste the instructions from `docs/agent_instructions.md`.
+1. Write the agent instructions (role, safety rules, answer format).
 2. Enable **Code Interpreter**.
-3. Upload the PDFs from `docs/` as the knowledge base.
+3. Upload the maintenance documents to the Storage account and attach them as knowledge.
 4. Add the **GitHub MCP** tool.
 
 ### 2. Install the client
@@ -102,32 +102,19 @@ az login
 python agent.py
 ```
 
-## Example conversation
+When the agent wants to use the GitHub tool, the terminal shows the call and asks `Approve this call? [y/N]`.
 
-```text
-You: What should I check if the gearbox oil temperature alarm appears?
-Agent: Alarm A101 (oil temperature above 75 °C). Check the oil level and the filter,
-       and inspect the cooling fan. Stop the turbine if it exceeds 85 °C.
-       Source: Maintenance Manual, section 3. Remember to apply lock-out/tag-out.
+## Real examples
 
-You: Open a high-priority ticket for WT-03: abnormal vibration at the main bearing.
-
-[tool request] github.create_issue({...})
-Approve this call? [y/N]: y
-
-Agent: Ticket created: "[WT-03] Abnormal vibration at main bearing" (priority High).
-```
+| Ticket | Situation | Agent outcome |
+|---|---|---|
+| [#4](../../issues/4) | WTG-01: request to climb the tower for a yaw inspection with 16 m/s forecast at hub height | Climb **not approved**: the safety procedure (HR-HSE-003) limits tower and nacelle work to 15 m/s. Postpone, use at least 2 qualified technicians, work permit and full LOTO |
+| [#1](../../issues/1) | WTG-03: metallic noise from the gearbox, alarms E-101 and E-110, oil at 80 °C | Diagnosis consistent with high-speed shaft bearing wear. Urgent action plan, spare part GB-HSB-22 (lead time 6 weeks) and safety precautions |
+| [#5](../../issues/5) | WTG-02: work order to verify pitch calibration of blade B | Work order with reason, urgency, safety precautions and a note on the documents still to consult before execution |
 
 ## Maintenance tickets
 
-Tickets are GitHub issues that follow the template in `.github/ISSUE_TEMPLATE/`:
-
-| Field | Values |
-|---|---|
-| Turbine | WT-XX |
-| Priority | Critical, High, Medium, Low |
-| Type | Corrective, Preventive, Inspection |
-| Content | Symptom, suspected component, recommended action, status |
+Tickets are GitHub issues, one per incident, labelled by turbine (WTG-01 to WTG-04) and type (for example `work order`). The template in `.github/ISSUE_TEMPLATE/` asks for the reporter, the date, the turbine and a description with alarms and SCADA values.
 
 ## Troubleshooting
 
@@ -136,7 +123,7 @@ Tickets are GitHub issues that follow the template in `.github/ISSUE_TEMPLATE/`:
 | `KeyError: 'FOUNDRY_PROJECT_ENDPOINT'` | The `.env` file is missing or empty. Copy `.env.example` and fill it in. |
 | Authentication error | Run `az login` again and check that your account has access to the Foundry project. |
 | Agent not found | `FOUNDRY_AGENT_NAME` must match the agent name in the portal exactly. |
-| Agent ignores the manual | Check in the portal that the PDFs are attached to the agent as knowledge. |
+| Agent ignores the documents | Check in the portal that the PDFs are attached to the agent as knowledge. |
 
 ## Tech stack
 
